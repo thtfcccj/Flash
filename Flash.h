@@ -51,6 +51,10 @@ void Flash_cbErasePageStartNotify(void);
 //不需要此功能时实现为空：
 //#define Flash_cbErasePageStartNotify() do{}while(0)  
 
+//-----------------------写单位数据间隔期间通报---------------------------
+//写一组数据期间将调用此函数防止
+void Flash_cbWrIdieNotify(void);
+
 #endif
 
 

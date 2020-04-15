@@ -215,6 +215,7 @@ void Flash_Write(unsigned long Adr,   //Flash地址
     unsigned long long llData;
     memcpy(&llData, pOrgData, 8);
     _Write2Word(pllWrAdr, llData);
+    Flash_cbWrIdieNotify(); //写空闲通报
   }
   pWrAdr = (unsigned char*)pllWrAdr;
   #endif
@@ -227,6 +228,7 @@ void Flash_Write(unsigned long Adr,   //Flash地址
     unsigned long lData;
     memcpy(&lData, pOrgData, 4);
     _WriteWord(plWrAdr, lData);
+    Flash_cbWrIdieNotify(); //写空闲通报
   }
   pWrAdr = (unsigned char*)plWrAdr;
   #endif
@@ -239,6 +241,7 @@ void Flash_Write(unsigned long Adr,   //Flash地址
     unsigned short sData;
     memcpy(&sData, pOrgData, 4);
     _Write2Byte(psWrAdr, sData);
+    Flash_cbWrIdieNotify(); //写空闲通报
   }
   pWrAdr = (unsigned char*)psWrAdr;
   #endif
