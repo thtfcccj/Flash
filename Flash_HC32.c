@@ -15,6 +15,9 @@ unsigned long Flash_ErrCount = 0; //失败计数器
                               配置说明
 不可在此修改以免影响一致性！
 ****************************************************************************/
+
+//#define SUPPORT_MDK   //Keil MDK环境时，需定义
+
 //注：SYS_MHZ为全局定义
 #define _DELAY_MUTI        ((SYS_MHZ + 3) / 4)   //4M为基准插入延时
 #define FLASH              M0P_FLASH       //别名
@@ -36,11 +39,16 @@ unsigned long Flash_ErrCount = 0; //失败计数器
 ****************************************************************************/
 
 //-----------------------------写保护寄存器函数----------------------------
-//怎么样限制此函数在32k内？？？
-
 //只有指定预列才能写FLASH结构寄存器里需调用此函数
-static void _WrProtReg(__IO uint32_t *pReg,        //待写入的受保护寄存器
-                       unsigned long Data)      //待定入的数据
+#ifdef SUPPORT_MDK    //需限制此函数在32k内, Keil MDK环境定义
+  void _WrProtReg(__IO uint32_t *pReg,
+                  unsigned long Data) __attribute__((section(".ARM.__at_0x400")));
+  static void _WrProtReg(__IO uint32_t *pReg,        //待写入的受保护寄存器
+                          unsigned long Data)
+#else // IAR环境定义, Flash容量<32k时可不在icf文件中指定
+  static void _WrProtReg(__IO uint32_t *pReg,        //待写入的受保护寄存器
+                          unsigned long Data)@".Flash_WrProtReg" //IAR环境定义
+#endif
 {
   unsigned short Count = 255 * _DELAY_MUTI; //例程中的值
   for(; Count > 0; Count--){
@@ -52,11 +60,9 @@ static void _WrProtReg(__IO uint32_t *pReg,        //待写入的受保护寄存器
   Flash_ErrCount++; //写错误计数
 }
 
-//-----------------------------Flash写操作函数--------------------------
-//怎么样限制此函数在32k内？？？
-
+//-----------------------------Flash写操作完成等待函数--------------------------
 //返回值同Flash_ErasePage()
-static void _WaitDone(unsigned short Time) //等待us时间
+static void _WaitDone(unsigned short Time)//IAR环境定义
 {
   for(; Time > 0; Time--){
     if(!(M0P_FLASH->CR_f.BUSY)) return; //非忙时写完了
@@ -65,28 +71,43 @@ static void _WaitDone(unsigned short Time) //等待us时间
   Flash_ErrCount++; //写错误计数
 }
 
+//------------------------------寄存器默认值------------------------------------
+#if (_DELAY_MUTI > 1)
+  static const unsigned long _DelayRegDefault[] ={
+    0x20,      //Tnvs 时间参数
+    0x17,      //Tpgs 时间参数
+    0x1b,      //Tprog 时间参数
+    0x4650,    //Tserase 时间参数
+    0x222E0,  //Tmerase 时间参数
+    0x18,     //Tprcv 时间参数
+    0xF0,     //Tsrcv 时间参数
+    0x03E8,   //Tmrcv时间参数
+  };
+
+#endif //_DELAY_MUTI
+
+
 /***************************************************************************
                         标准接口函数实现
 ****************************************************************************/
 
-//------------------------初始化函数------------------------------
+//------------------------------初始化函数------------------------------------
 void Flash_Init(void)
 {
   //修改默认定时值与系统相同
   //根据芯片资料，默认值是以4M为基础，否则应根据系统进钟成倍调整
-  if(_DELAY_MUTI > 1){
+  #if (_DELAY_MUTI > 1)
     __IO uint32_t *pDelayReg = &FLASH->TNVS; //定时值起始，共8个
-    __IO uint32_t *pEndDelayReg = pDelayReg + 8;
-    for(; pDelayReg < pEndDelayReg; pDelayReg++)
-      _WrProtReg(pDelayReg, *pDelayReg * _DELAY_MUTI);
-  }
+    for(unsigned char i = 0; i < 8; i++, pDelayReg++)
+      _WrProtReg(pDelayReg, _DelayRegDefault[i] * _DELAY_MUTI);
+  #endif
   
   //重配置读等待周期
   //根据芯片资料,超24M时每起过24M多一值
-  if((_DELAY_MUTI / 6) > 0){
-    unsigned long Data = FLASH->CR & ~0xC0;
+  #if ((_DELAY_MUTI / 6) > 1)
+    unsigned long Data = FLASH->CR & ~0x0C;
       _WrProtReg(&FLASH->CR, Data | ((_DELAY_MUTI / 6) << 2));
-  }
+  #endif
 }
 
 //---------------------------Flash解锁实现---------------------------------
@@ -102,11 +123,15 @@ void Flash_Lock(void)
 }
 
 //---------------------------------Flash页擦除函数实现-----------------------
-//怎么样限制此函数在32k内？？？
-
 //此函数仅负责页擦除，不负责加解锁等
 //统一返回值定义: 0完成 1忙 2编程错误 3写保护错误
-void Flash_ErasePage(unsigned long Adr)
+#ifdef SUPPORT_MDK    //需限制此函数在32k内, Keil MDK环境定义
+  void Flash_InErasePage(unsigned long Adr) __attribute__((section(".ARM.__at_0x500")));
+  void Flash_ErasePage(unsigned long Adr) {Flash_InErasePage(Adr); }
+  void Flash_InErasePage(unsigned long Adr)
+#else // IAR环境定义, Flash容量<32k时可不在icf文件中指定
+void Flash_ErasePage(unsigned long Adr)@".Flash_ErasePage"
+#endif
 {
   _WrProtReg(&FLASH->CR, FLASH->CR | 2);  //进入页擦除模式
   _WrProtReg(&FLASH->SLOCK, 1 << ((Adr - FLASH_BASE) / FLASH_SLOCK_SIZE));//取消页保护
@@ -116,14 +141,20 @@ void Flash_ErasePage(unsigned long Adr)
   _WrProtReg(&FLASH->SLOCK, 0);//加上页保护
 }
 
+
 //-------------------------写数据到Flash中实现----------------------------
-//怎么样限制此函数在32k内？？？
-
 //此函数仅负责向Flash写数据，不负责加解锁及擦除
-
+#ifdef SUPPORT_MDK    //需限制此函数在32k内, Keil MDK环境定义
+  void Flash_InWrite(unsigned long Adr,const void *pVoid,unsigned long Len) \
+                                    __attribute__((section(".ARM.__at_0x600")));
+  void Flash_Write(unsigned long Adr,const void *pVoid,unsigned long Len)
+  {Flash_InWrite(Adr, pVoid, Len); }
+  void Flash_InWrite(unsigned long Adr,const void *pVoid,unsigned long Len)
+#else // IAR环境定义, Flash容量<32k时可不在icf文件中指定
 void Flash_Write(unsigned long Adr,   //Flash地址
                  const void *pVoid,  //要写入的数据
-                 unsigned long Len)   //写数据长度  
+                 unsigned long Len)@".Flash_Write" //IAR环境定义
+#endif
 {
   //写前准备：
   _WrProtReg(&FLASH->CR, FLASH->CR | 1);  //进入写模式
