@@ -6,7 +6,7 @@
 
 #include "Flash.h"
 #include "Delay.h"
-#include "hc32f030e8pa.h" //以此为例
+#include "HC32.h"
 #include "string.h" //memcpy
 unsigned long Flash_ErrCount = 0; //失败计数器
 
@@ -133,14 +133,15 @@ void Flash_Lock(void)
 void Flash_ErasePage(unsigned long Adr)@".Flash_ErasePage"
 #endif
 {
+  __disable_irq();
   _WrProtReg(&FLASH->CR, FLASH->CR | 2);  //进入页擦除模式
   _WrProtReg(&FLASH->SLOCK, 1 << ((Adr - FLASH_BASE) / FLASH_SLOCK_SIZE));//取消页保护
   *(volatile unsigned char*)Adr = 0xff; //写入任意数据启动
   _WaitDone(21000);   //等待操作结束,>20ms为经验值
-  _WrProtReg(&FLASH->CR, FLASH->CR & 0x03);  //退出页擦除模式
+  _WrProtReg(&FLASH->CR, FLASH->CR & ~0x03);  //退出页擦除模式
   _WrProtReg(&FLASH->SLOCK, 0);//加上页保护
+  __enable_irq();
 }
-
 
 //-------------------------写数据到Flash中实现----------------------------
 //此函数仅负责向Flash写数据，不负责加解锁及擦除
@@ -157,6 +158,7 @@ void Flash_Write(unsigned long Adr,   //Flash地址
 #endif
 {
   //写前准备：
+  __disable_irq();
   _WrProtReg(&FLASH->CR, FLASH->CR | 1);  //进入写模式
   _WrProtReg(&FLASH->SLOCK, 1 << ((Adr - FLASH_BASE) / FLASH_SLOCK_SIZE));//取消页保护
   
@@ -182,8 +184,9 @@ void Flash_Write(unsigned long Adr,   //Flash地址
   }
   
   _EndWrPro: //结束写处理
-    _WrProtReg(&FLASH->CR, FLASH->CR & 0x03);  //取消写模式
+    _WrProtReg(&FLASH->CR, FLASH->CR & ~0x03);  //取消写模式
     _WrProtReg(&FLASH->SLOCK, 0);//加上页保护
+    __enable_irq();
 }
 
 //----------------------------从Flash中读取数据实现----------------------
