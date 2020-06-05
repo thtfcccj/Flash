@@ -101,13 +101,6 @@ void Flash_Init(void)
     for(unsigned char i = 0; i < 8; i++, pDelayReg++)
       _WrProtReg(pDelayReg, _DelayRegDefault[i] * _DELAY_MUTI);
   #endif
-  
-  //重配置读等待周期
-  //根据芯片资料,超24M时每起过24M多一值
-  #if ((_DELAY_MUTI / 6) > 1)
-    unsigned long Data = FLASH->CR & ~0x0C;
-      _WrProtReg(&FLASH->CR, Data | ((_DELAY_MUTI / 6) << 2));
-  #endif
 }
 
 //---------------------------Flash解锁实现---------------------------------
