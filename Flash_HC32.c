@@ -92,8 +92,8 @@ static void _ProtSector(unsigned long Adr,     //Flash地址
 {
   unsigned short Offset = (Adr - FLASH_BASE) / FLASH_SLOCK_SIZE;
   unsigned long ProtFlag;
-  if(IsCancel) ProtFlag = 0; //保护寄存器全部写0
-  else ProtFlag  = 1 << (Offset & 0x1f);//取消时对应位写1
+  if(!IsCancel) ProtFlag = 0; //保护:寄存器全部写0
+  else ProtFlag  = 1 << (Offset & 0x1f);//取消: 对应位写1
   
   #if ((FLASH_CAPABILITY / FLASH_SLOCK_SIZE) <= 32)//一页即写下了
     _WrProtReg(&FLASH->SLOCK, ProtFlag);
