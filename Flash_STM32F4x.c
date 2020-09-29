@@ -173,14 +173,19 @@ void Flash_ErasePage(unsigned long Adr)
   FLASH->CR |= FLASH_CR_SER;  //页擦除模式
   FLASH->CR &= ~FLASH_CR_SNB; //清除位置
   FLASH->CR |= _Adr2SNB(Adr); //指定位置
-  FLASH->CR |= FLASH_CR_STRT;     //开始擦除
   
-  //分时以喂狗
-  for(unsigned char i = 210; i > 0; i--){
-    _WaitDone(1000);   //等待操作结束
-  }
+  //擦除期间要执行代码时，在放在RAM中执行
+  #ifndef SUPPORT_FLASH_ERASE_IN_RAM
+    //开始擦除(实际在擦除FLASH的期间，读取（取指）FLASH，会被暂停)
+    FLASH->CR |= FLASH_CR_STRT; 
+    //分时以喂狗(
+    for(unsigned char i = 210; i > 0; i--){
+      _WaitDone(1000);   //等待操作结束
+    }
+  #else
+    Flash_cbEraseInRam(); //放在RAM中执行的代码
+  #endif
   FLASH->CR &= ~(1 << 1);      //无条件清除页擦除标志
-  
   _Lock();//上锁
 }
 
