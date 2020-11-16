@@ -199,7 +199,7 @@ void Flash_Write(unsigned long Adr,   //Flash地址
   unsigned char *pWrAdr = (unsigned char*)Adr;
   
   //写入地址没双字对齐时，先一字一字写入以对齐  
-  if(Adr & 0x07){
+  if((Adr & 0x07) || (Len <= 7)){
     unsigned char CurLen;
     if(Len > 7) CurLen = 7;
     else CurLen = Len;
