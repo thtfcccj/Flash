@@ -1,6 +1,6 @@
 /***************************************************************************
 
-                     Flash标准接口-在Hc32中的实现
+                     Flash标准接口-在Hc32(默认M0P)中的实现
 对 FLASH进行页擦除的代码所在地址必须小于 32768
 ****************************************************************************/
 
@@ -20,7 +20,10 @@ unsigned long Flash_ErrCount = 0; //失败计数器
 
 //注：SYS_MHZ为全局定义
 #define _DELAY_MUTI        ((SYS_MHZ + 3) / 4)   //4M为基准插入延时
-#define FLASH              M0P_FLASH       //别名
+
+#ifndef FLASH
+  #define FLASH              M0P_FLASH       //别名
+#endif
 
 #ifndef FLASH_BASE //FALSH基址
   #define FLASH_BASE   0x00000000 //默认为0
@@ -65,7 +68,7 @@ unsigned long Flash_ErrCount = 0; //失败计数器
 static void _WaitDone(unsigned short Time)//IAR环境定义
 {
   for(; Time > 0; Time--){
-    if(!(M0P_FLASH->CR_f.BUSY)) return; //非忙时写完了
+    if(!(FLASH->CR_f.BUSY)) return; //非忙时写完了
     DelayUs(1);
   }
   Flash_ErrCount++; //写错误计数
